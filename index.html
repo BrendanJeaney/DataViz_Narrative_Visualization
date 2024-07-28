@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Viz Narrative Visualization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #f0f0f0;
+        }
+        #slideshow {
+            position: relative;
+            width: 90%;
+            max-width: 1000px;
+            height: 90%;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            background: white;
+        }
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 1s;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            align-items: center;
+        }
+        .slide.active {
+            opacity: 1;
+        }
+        .chart {
+            width: 90%;
+            height: 30%;
+        }
+        .caption {
+            position: absolute;
+            bottom: 10px;
+            left: 20px;
+            color: black;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
+            font-size: 1.2em;
+        }
+        .nav-arrow {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 1.5em;
+            color: black;
+            cursor: pointer;
+            user-select: none;
+            z-index: 10;
+        }
+        .nav-arrow.right {
+            left: 40px;
+        }
+        #textbox {
+            position: absolute;
+            top: 30%;
+            right: 40px;
+            width: 200px;
+            height: 300px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            background: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div id="slideshow">
+        <div class="slide active" data-caption="Global Tree Cover Loss Narrative Visualization">
+            <div class="chart" id="tree-cover-loss"></div>
+            <div class="chart" id="country-breakdown"></div>
+            <div class="chart" id="country-trend"></div>
+        </div>
+        <div class="caption"></div>
+        <div class="nav-arrow left">&#9664;</div>
+        <div class="nav-arrow right">&#9654;</div>
+    </div>
+    <div id="textbox"></div>
+
+    <script src="tcl_data.js"></script>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const slides = d3.selectAll(".slide");
+            const caption = d3.select(".caption");
+            const leftArrow = d3.select(".nav-arrow.left");
+            const rightArrow = d3.select(".nav-arrow.right");
+            let currentIndex = 0;
+            const textbox = d3.select("#textbox");
+            let selectedCountry = null;
+
+            const countryData = data;
+
+            const treeCoverLossData = Object.values(data.reduce((acc, item) => {
+                if (!acc[item.year]) {
+                    acc[item.year] = { year: item.year, value: 0 };
+                }
+                acc[item.year].value += Math.round(item.value);
+                return acc;
+            }, {}));
+
+            const maxIndex = treeCoverLossData.length;
+
+            const textArray = treeCoverLossData.map((item, index) => {
+                let yearData = data.filter(d => d.year === item.year);
+                let increase = true;
+            
+                // Sort countries by value
+                yearData.sort((a, b) => b.value - a.value);
+                
+                let top3 = yearData.slice(0, 3);
+                let description = `${item.year}: `;
+            
+                if (index > 0) {
+                    let previousValue = treeCoverLossData[index - 1].value;
+                    increase = Math.round(item.value) > previousValue;
+                    differenceText = increase ? `An increase from the previous year, ${previousValue} to ${Math.round(item.value)}.` : ``;
+                    description += differenceText;
+                }
+            
+                description += `The greatest contributor to tree cover loss was ${top3[0].country} with ${Math.round(top3[0].value)} hectares. `;
+                description += `The second greatest was ${top3[1].country} with ${Math.round(top3[1].value)} hectares and `;
+                description += `third was ${top3[2].country} with ${Math.round(top3[2].value)} hectares`;
+
+                differenceText = increase ? `.` : `This was a decrease from the previous year.`;
+                description += differenceText;
+            
+                return description;
+            });
+
+            // console.log(txtArr);
+            textArray.shift();
+            console.log(textArray);
+
+            //const textArray = new Array(treeCoverLossData.length).fill("");
+
+            // const textArray = [
+            //     "2002: Brazil is the largest contributor to ",
+            //     "Text for year 2001",
+            //     "Text for year 2002",
+            // ];
+
+            // const textArray = treeCoverLossData.map(data => `${data.year}: ${data.value}`);
+
+            function showSlide(index) {
+                slides.classed("active", true);
+                caption.text(`Global Tree Cover Loss Narrative Visualization - ${treeCoverLossData[index].year+1}`);
+                textbox.text(textArray[index]);
+                updateVisualization(index);
+            }
+
+            function updateVisualization(index) {
+                const sliceSize = index + 2;
+                drawCharts(
+                    "#tree-cover-loss", "#country-breakdown", "#country-trend",
+                    treeCoverLossData.slice(0, sliceSize),
+                    countryData,
+                    index
+                );
+            }
+
+            function nextSlide() {
+                if (currentIndex < maxIndex - 1) {
+                    currentIndex++;
+                    showSlide(currentIndex);
+                }
+            }
+
+            function prevSlide() {
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    showSlide(currentIndex);
+                }
+            }
+
+            rightArrow.on("click", nextSlide);
+            leftArrow.on("click", prevSlide);
+
+            showSlide(0);
+
+            function drawCharts(treeCoverLossSelector, countryBreakdownSelector, countryTrendSelector, treeCoverLossData, countryData, index) {
+                drawLineChart(treeCoverLossSelector, treeCoverLossData, `Global Tree Cover Loss Year-to-Year in Hectares`);
+
+                drawPieChart(countryBreakdownSelector, countryData, treeCoverLossData[index].year);
+
+                if (selectedCountry) {
+                    drawCountryTrendLineChart(countryTrendSelector, countryData.filter(d => d.country === selectedCountry), countryData, index);
+                }
+            }
+
+            function drawLineChart(selector, data, title) {
+                const margin = { top: 30, right: 30, bottom: 30, left: 40 };
+                const width = 800 - margin.left - margin.right;
+                const height = 200 - margin.top - margin.bottom;
+
+                d3.select(selector).selectAll("*").remove();
+
+                const svg = d3.select(selector).append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top})`);
+                
+                svg.append("g").attr("class", "x-axis");
+                svg.append("g").attr("class", "y-axis");
+                svg.append("path").attr("class", "line");
+                svg.append("text").attr("class", "title")
+                    .attr("x", width / 2)
+                    .attr("y", 10 - margin.top / 2)
+                    .attr("text-anchor", "middle")
+                    .style("font-size", "16px");
+
+                const x = d3.scaleBand()
+                    .domain(data.map(d => d.year))
+                    .range([0, width])
+                    .padding(0.1);
+
+                const y = d3.scaleLinear()
+                    .domain([0, d3.max(data, d => d.value)])
+                    .nice()
+                    .range([height, 0]);
+
+                svg.select(".x-axis")
+                    .attr("transform", `translate(0,${height})`)
+                    .call(d3.axisBottom(x).tickFormat(d3.format("d")));
+
+                svg.select(".y-axis").call(d3.axisLeft(y));
+
+                svg.select(".line")
+                    .datum(data)
+                    .attr("fill", "none")
+                    .attr("stroke", "steelblue")
+                    .attr("stroke-width", 1.5)
+                    .attr("d", d3.line()
+                        .x(d => x(d.year) + x.bandwidth() / 2)
+                        .y(d => y(d.value))
+                    );
+
+                svg.select(".title").text(title);
+            }
+
+            function drawPieChart(selector, data, year) {
+                const margin = { top: 30, right: 30, bottom: 30, left: 40 };
+                const width = 800 - margin.left - margin.right;
+                const height = 200 - margin.top - margin.bottom;
+                const radius = Math.min(width, height) / 2;
+
+                d3.select(selector).selectAll("*").remove();
+
+                const svg = d3.select(selector).append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", `translate(${(width + margin.left + margin.right) / 2},${(height + margin.top + margin.bottom) / 2})`);
+
+                svg.append("g").attr("class", "slices");
+
+                let yearData = data.filter(d => d.year === year);
+
+                yearData.sort((a, b) => b.value - a.value);
+                const top5 = yearData.slice(0, 5);
+                const other = yearData.slice(5).reduce((acc, d) => acc + d.value, 0);
+                if (other > 0) {
+                    top5.push({ year: year, country: "Other", value: other });
+                }
+
+                const pie = d3.pie()
+                    .value(d => d.value)
+                    .sort(null);
+
+                const arc = d3.arc()
+                    .innerRadius(0)
+                    .outerRadius(radius);
+
+                const slices = svg.select(".slices").selectAll("path").data(pie(top5));
+                slices.enter().append("path")
+                    .merge(slices)
+                    .attr("d", arc)
+                    .attr("fill", (d, i) => d3.schemeCategory10[i])
+                    .on("mouseover", function(event, d) {
+                        d3.select(this).append("title")
+                            .text(`${d.data.country}: ${Math.round(d.data.value)}`);
+                        d3.select(".hover-label").text(d.data.country);
+                    })
+                    .on("mouseout", function(event, d) {
+                        d3.select(this).select("title").remove();
+                        d3.select(".hover-label").text("");
+                    })
+                    .on("click", function(event, d) {
+                        selectedCountry = d.data.country;
+                        drawCountryTrendLineChart("#country-trend", data.filter(e => e.country === selectedCountry), countryData, currentIndex);
+                    });
+                slices.exit().remove();
+
+                svg.append("text")
+                    .attr("x", 0)
+                    .attr("y", -radius - 10)
+                    .attr("text-anchor", "middle")
+                    .style("font-size", "16px")
+                    .text("Breakdown by Country");
+
+                
+                const legend = svg.append("g")
+                    .attr("class", "legend")
+                    .attr("transform", `translate(${radius + 20}, -${height / 2})`);
+
+                const legendItems = legend.selectAll(".legend-item")
+                    .data(pie(top5))
+                    .enter().append("g")
+                    .attr("class", "legend-item")
+                    .attr("transform", (d, i) => `translate(0, ${i * 20})`);
+
+                legendItems.append("rect")
+                    .attr("width", 18)
+                    .attr("height", 18)
+                    .attr("fill", (d, i) => d3.schemeCategory10[i]);
+
+                legendItems.append("text")
+                    .attr("x", 24)
+                    .attr("y", 9)
+                    .attr("dy", "0.35em")
+                    .style("text-anchor", "start")
+                    .text(d => d.data.country);
+
+                // Add hover label for country names
+                svg.append("text")
+                    .attr("class", "hover-label")
+                    .attr("x", 0)
+                    .attr("y", radius + 20)
+                    .attr("text-anchor", "middle")
+                    .style("font-size", "12px");
+
+                // Draw the initial country trend line chart if a country is selected
+                if (selectedCountry) {
+                    drawCountryTrendLineChart("#country-trend", data.filter(d => d.country === selectedCountry), countryData, index);
+                }
+            }
+
+            function drawCountryTrendLineChart(selector, data, globalData, index) {
+                const margin = { top: 30, right: 30, bottom: 30, left: 40 };
+                const width = 800 - margin.left - margin.right;
+                const height = 200 - margin.top - margin.bottom;
+
+                const rankings = globalData.reduce((acc, d) => {
+                    if (!acc[d.year]) acc[d.year] = [];
+                    acc[d.year].push({ country: d.country, value: d.value });
+                    return acc;
+                }, {});
+
+                for (let year in rankings) {
+                    rankings[year].sort((a, b) => b.value - a.value);
+                    rankings[year] = rankings[year].map((d, i) => ({ ...d, rank: i + 1 }));
+                }
+
+                const countryRanks = data.map(d => ({
+                    ...d,
+                    rank: rankings[d.year].find(c => c.country === d.country).rank
+                }));
+
+                const svg = d3.select(selector).selectAll("svg").data([null]);
+                const svgEnter = svg.enter().append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top})`);
+                
+                svgEnter.append("g").attr("class", "x-axis");
+                svgEnter.append("g").attr("class", "y-axis");
+                svgEnter.append("path").attr("class", "line");
+                svgEnter.append("text").attr("class", "title")
+                    .attr("x", width / 2)
+                    .attr("y", 10 - margin.top / 2) 
+                    .attr("text-anchor", "middle")
+                    .style("font-size", "16px");
+
+                const g = svg.merge(svgEnter);
+
+                const x = d3.scaleBand()
+                    .domain(countryRanks.map(d => d.year))
+                    .range([0, width])
+                    .padding(0.1);
+
+                const y = d3.scaleLinear()
+                    .domain([10, 1])
+                    .nice()
+                    .range([height, 0]);
+
+                g.select(".x-axis")
+                    .attr("transform", `translate(0,${height})`)
+                    .call(d3.axisBottom(x).tickFormat(d3.format("d")));
+
+                g.select(".y-axis").call(d3.axisLeft(y));
+
+                g.select(".line")
+                    .datum(countryRanks)
+                    .attr("fill", "none")
+                    .attr("stroke", "steelblue")
+                    .attr("stroke-width", 1.5)
+                    .attr("d", d3.line()
+                        .x(d => x(d.year) + x.bandwidth() / 2)
+                        .y(d => y(d.rank))
+                    );
+
+                
+                const dots = g.selectAll(".dot").data(countryRanks);
+
+                dots.enter().append("circle")
+                    .attr("class", "dot")
+                    .attr("cx", d => x(d.year) + x.bandwidth() / 2)
+                    .attr("cy", d => y(d.rank))
+                    .attr("r", 2)
+                    .attr("fill", "blue")
+                    .on("mouseover", function(event, d) {
+                        d3.select(this)
+                            .append("title")
+                            .text(`Year: ${d.year}\nRanking: ${d.rank}`);
+                    });
+
+                dots.exit().remove();
+
+                g.select(".title").text(`Trend for ${selectedCountry}`);
+            }
+        });
+    </script>
+</body>
+</html>
